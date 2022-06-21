@@ -11,6 +11,8 @@
 #    PLATFORM_RPI:      Raspberry Pi (Raspbian)
 #    PLATFORM_DRM:      Linux native mode, including Raspberry Pi 4 with V3D fkms driver
 #    PLATFORM_WEB:      HTML5 (Chrome, Firefox)
+#    PLATFORM_NX:       Switch LibNX
+#    PLAYFORM_SCE_VITA: Sony PlayStation Vita
 #
 #  Many thanks to Milan Nikolic (@gen2brain) for implementing Android platform pipeline.
 #  Many thanks to Emanuele Petriglia for his contribution on GNU/Linux pipeline.
@@ -164,6 +166,15 @@ ifeq ($(PLATFORM),PLATFORM_WEB)
     export PATH         = $(EMSDK_PATH);$(EMSCRIPTEN_PATH);$(CLANG_PATH);$(NODE_PATH);$(PYTHON_PATH);C:\raylib\MinGW\bin:$$(PATH)
 endif
 
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    UNAMEOS = $(shell uname)
+    ifeq ($(UNAMEOS),Linux)
+        PLATFORM_OS = LINUX
+    endif
+    RAYLIB_LIBTYPE = STATIC
+    USE_EXTERNAL_GLFW = TRUE
+endif
+
 ifeq ($(PLATFORM),PLATFORM_ANDROID)
     # Android architecture
     # Starting at 2019 using arm64 is mandatory for published apps,
@@ -222,6 +233,12 @@ ifeq ($(PLATFORM),PLATFORM_ANDROID)
     # By default use OpenGL ES 2.0 on Android
     GRAPHICS = GRAPHICS_API_OPENGL_ES2
 endif
+ifeq ($(PLATFORM),PLATFORM_NX)
+    GRAPHICS = GRAPHICS_API_OPENGL_ES2
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    GRAPHICS = GRAPHICS_API_OPENGL_ES2
+endif
 
 # Define default C compiler and archiver to pack library
 CC = gcc
@@ -263,6 +280,24 @@ ifeq ($(PLATFORM),PLATFORM_ANDROID)
     AR = $(ANDROID_TOOLCHAIN)/bin/llvm-ar
 endif
 
+ifeq ($(PLATFORM),PLATFORM_NX)
+    ifeq ($(strip $(DEVKITPRO)),)
+        $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
+    endif
+    include $(DEVKITPRO)/libnx/switch_rules
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    ifeq ($(strip $(VITASDK)),)
+        $(error "VITASDK not defined")
+    endif
+	
+    CC = $(VITASDK)/bin/arm-vita-eabi-gcc
+	CXX = $(VITASDK)/bin/arm-vita-eabi-g++
+    AR = $(VITASDK)/bin/arm-vita-eabi-gcc-ar
+#TODO: MH_VITA
+endif
+
+
 # Define compiler flags:
 #  -O1                      defines optimization level
 #  -g                       include debug information on compilation
@@ -298,6 +333,12 @@ ifeq ($(RAYLIB_BUILD_MODE),RELEASE)
         CFLAGS += -s -O1
     endif
     ifeq ($(PLATFORM),PLATFORM_ANDROID)
+        CFLAGS += -O2
+    endif
+    ifeq ($(PLATFORM),PLATFORM_NX)
+        CFLAGS += -O2
+    endif
+    ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
         CFLAGS += -O2
     endif
 endif
@@ -376,6 +417,18 @@ endif
 # Define include paths for required headers
 # NOTE: Several external required libraries (stb and others)
 INCLUDE_PATHS = -I. -Iexternal/glfw/include -Iexternal/glfw/deps/mingw
+
+# Define additional directories containing required header files
+ifeq ($(PLATFORM),PLATFORM_NX)
+    LIBDIRS	:= $(PORTLIBS) $(LIBNX)
+    ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
+    CFLAGS	+=	-ffunction-sections -fdata-sections $(ARCH) $(foreach dir,$(LIBDIRS),-I$(dir)/include) -D__SWITCH__
+    INCLUDE_PATHS = -I. -I./switch-nx
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+	LIBDIRS := $(VITASDK)
+# TODO: MH_VITA
+endif
 
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),BSD)

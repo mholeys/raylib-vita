@@ -23,6 +23,11 @@
 
 .PHONY: all clean
 
+# Define required environment variables
+#------------------------------------------------------------------------------------------------
+# Define target platform: PLATFORM_DESKTOP, PLATFORM_RPI, PLATFORM_DRM, PLATFORM_ANDROID, PLATFORM_WEB, PLATFORM_NX, PLATFORM_SCE_VITA
+PLATFORM              ?= PLATFORM_SCE_VITA
+
 # Define required raylib variables
 PROJECT_NAME       ?= raylib_examples
 RAYLIB_VERSION     ?= 4.0.0
@@ -101,6 +106,14 @@ ifeq ($(PLATFORM),PLATFORM_DRM)
         PLATFORM_OS=LINUX
     endif
 endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    UNAMEOS = $(shell uname)
+    ifeq ($(UNAMEOS),Linux)
+        PLATFORM_OS = LINUX
+    endif
+    RAYLIB_LIBTYPE = STATIC
+    USE_EXTERNAL_GLFW = TRUE
+endif
 
 # RAYLIB_PATH adjustment for different platforms.
 # If using GNU make, we can get the full path to the top of the tree. Windows? BSD?
@@ -131,9 +144,19 @@ ifeq ($(PLATFORM),PLATFORM_WEB)
     export PATH         = $(EMSDK_PATH);$(EMSCRIPTEN_PATH);$(CLANG_PATH);$(NODE_PATH);$(PYTHON_PATH);C:\raylib\MinGW\bin:$$(PATH)
 endif
 
+ifeq ($(PLATFORM),PLATFORM_NX)
+    RAYLIB_PREFIX ?= ..
+    RAYLIB_PATH    = $(realpath $(RAYLIB_PREFIX))
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    RAYLIB_PREFIX ?= ..
+    RAYLIB_PATH    = $(realpath $(RAYLIB_PREFIX))
+endif
+
 # Define raylib release directory for compiled library.
 # RAYLIB_RELEASE_PATH points to provided binaries or your freshly built version
 RAYLIB_RELEASE_PATH 	?= $(RAYLIB_PATH)/src
+
 
 # EXAMPLE_RUNTIME_PATH embeds a custom runtime location of libraylib.so or other desired libraries
 # into each example binary compiled with RAYLIB_LIBTYPE=SHARED. It defaults to RAYLIB_RELEASE_PATH
@@ -176,6 +199,21 @@ ifeq ($(PLATFORM),PLATFORM_WEB)
     # to use emscripten.h and emscripten_set_main_loop()
     CC = emcc
 endif
+ifeq ($(PLATFORM),PLATFORM_NX)
+    ifeq ($(strip $(DEVKITPRO)),)
+        $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
+    endif
+    include $(DEVKITPRO)/libnx/switch_rules
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    ifeq ($(strip $(VITASDK)),)
+        $(error "VITASDK not defined")
+    endif
+#    include("${VITASDK}/share/vita.cmake" REQUIRED)
+    CC = $(VITASDK)/bin/arm-vita-eabi-gcc
+    AR = $(VITASDK)/bin/arm-vita-eabi-gcc-ar
+#TODO: MH_VITA
+endif
 
 # Define default make program
 MAKE = make
@@ -211,6 +249,10 @@ ifeq ($(BUILD_MODE),DEBUG)
 else
     ifeq ($(PLATFORM),PLATFORM_WEB)
         CFLAGS += -Os
+    else ifeq ($(PLATFORM),PLATFORM_NX)
+        CFLAGS += -O2
+    else ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+        CFLAGS += -O2    
     else
         CFLAGS += -s -O1
     endif
@@ -250,6 +292,10 @@ endif
 ifeq ($(PLATFORM),PLATFORM_DRM)
     # DRM required libraries
     INCLUDE_PATHS += -I/usr/include/libdrm
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    #INCLUDE_PATHS += -I$(RAYLIB_PATH)/src/vita
+    LIBDIRS := $(VITASDK)
 endif
 ifeq ($(PLATFORM),PLATFORM_DESKTOP)
     ifeq ($(PLATFORM_OS),BSD)
@@ -374,6 +420,13 @@ ifeq ($(PLATFORM),PLATFORM_WEB)
     # Libraries for web (HTML5) compiling
     LDLIBS = $(RAYLIB_RELEASE_PATH)/libraylib.a
 endif
+ifeq ($(PLATFORM),PLATFORM_NX)
+    LDLIBS = -lraylib -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx -lm 
+endif
+ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
+    LDLIBS = -lraylib -lPVR_PSP2 -lEGL -lGLESv2 -lEGL -lpthread
+endif
+
 
 # Define all object files required
 CORE = \

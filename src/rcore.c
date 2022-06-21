@@ -11,6 +11,8 @@
 *       - PLATFORM_RPI:     Raspberry Pi 0,1,2,3 (Raspbian, native mode)
 *       - PLATFORM_DRM:     Linux native mode, including Raspberry Pi 4 with V3D fkms driver
 *       - PLATFORM_WEB:     HTML5 with WebAssembly
+*       - PLATFORM_NX:      Switch LibNX
+*       - PLATFORM_SCE_VITA:      Sony PlayStation Vita
 *
 *   CONFIGURATION:
 *
@@ -33,6 +35,15 @@
 *   #define PLATFORM_WEB
 *       Windowing and input system configured for HTML5 (run on browser), code converted from C to asm.js
 *       using emscripten compiler. OpenGL ES 2.0 required for direct translation to WebGL equivalent code.
+*
+*   #define PLATFORM_NX
+*       Windowing and input system configured for libnx (Nintendo Switch)
+*       graphic device is managed by EGL and inputs are processed is raw mode, reading from /dev/input/
+*
+*   #define PLATFORM_SCE_VITA
+*       TODO:
+*       Windowing and input system configured 
+*       graphic device is managed by EGL
 *
 *   #define SUPPORT_DEFAULT_FONT (default)
 *       Default font is loaded on window initialization to be available for the user to render simple text.
@@ -265,6 +276,35 @@
     #include <emscripten/html5.h>       // Emscripten HTML5 library
 #endif
 
+#if defined(PLATFORM_NX)
+    #include <switch.h>
+    #include <EGL/egl.h>    // EGL library
+    #include <EGL/eglext.h> // EGL extensions
+    #include <GLES2/gl2.h>  // OpenGL ES 2.0 library
+    #if defined(NX_USB_DEBUGGER)
+        #include "nxusb.h"
+    #endif
+#endif
+
+#if defined(PLATFORM_SCE_VITA)
+	#include <psp2/types.h>
+	
+    #include <psp2/kernel/modulemgr.h>
+    #include <psp2/kernel/processmgr.h>
+    #include <psp2/kernel/clib.h>
+	#include <psp2/touch.h> 
+    #include <psp2/ctrl.h>    
+
+    #include <PVR_PSP2/EGL/egl.h>
+    #include <PVR_PSP2/EGL/eglext.h>
+    #include <PVR_PSP2/GLES2/gl2.h>
+    
+    #include <PVR_PSP2/EGL/eglplatform.h>
+    #include <PVR_PSP2/gpu_es4/psp2_pvr_hint.h>
+    #include <PVR_PSP2/GLES2/gl2ext.h>
+	
+#endif
+
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
@@ -354,7 +394,8 @@ typedef struct CoreData {
 #if defined(PLATFORM_RPI)
         EGL_DISPMANX_WINDOW_T handle;       // Native window handle (graphic device)
 #endif
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
 #if defined(PLATFORM_DRM)
         int fd;                             // File descriptor for /dev/dri/...
         drmModeConnector *connector;        // Direct Rendering Manager (DRM) mode connector
@@ -463,6 +504,16 @@ typedef struct CoreData {
             pthread_t threadId;             // Gamepad reading thread id
             int streamId[MAX_GAMEPADS];     // Gamepad device file descriptor
 #endif
+
+#if defined(PLATFORM_NX)
+            PadState nxPad[MAX_GAMEPADS];   // Gamepad state holder
+#endif
+#if defined (PLATFORM_SCE_VITA)
+      // TODO: MH_VITA SEE  https://docs.vitasdk.org/group__SceCtrlUser.html     
+            SceCtrlData pad[MAX_GAMEPADS]; // Gamepad state
+            SceTouchData frontTouch[MAX_GAMEPADS]; // Front touch screen state
+	        SceTouchData rearTouch[MAX_GAMEPADS]; // Read touch screen state
+#endif
         } Gamepad;
     } Input;
     struct {
@@ -472,7 +523,7 @@ typedef struct CoreData {
         double draw;                        // Time measure for frame draw
         double frame;                       // Time measure for one frame
         double target;                      // Desired time for one frame, if 0 not applied
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)  || defined(PLATFORM_VITA_SCE)
         unsigned long long base;            // Base time measure for hi-res timer
 #endif
         unsigned int frameCounter;          // Frame counter
@@ -696,6 +747,22 @@ struct android_app *GetAndroidApp(void)
 // NOTE: data parameter could be used to pass any kind of required data to the initialization
 void InitWindow(int width, int height, const char *title)
 {
+#if defined(PLATFORM_NX) && defined(NX_USB_DEBUGGER)
+    NxUsbDebuggerInit();
+#endif
+#if defined(PLATFORM_SCE_VITA)
+	// Load needed modules
+	sceKernelLoadStartModule("vs0:sys/external/libfios2.suprx", 0, NULL, 0, NULL, NULL); // File IO
+    sceKernelLoadStartModule("vs0:sys/external/libc.suprx", 0, NULL, 0, NULL, NULL); 
+    sceKernelLoadStartModule("app0:module/libgpu_es4_ext.suprx", 0, NULL, 0, NULL, NULL);
+    sceKernelLoadStartModule("app0:module/libIMGEGL.suprx", 0, NULL, 0, NULL, NULL);
+    TRACELOG(LOG_INFO, "SCE Module init OK\n");
+
+    PVRSRV_PSP2_APPHINT hint;
+    PVRSRVInitializeAppHint(&hint);
+    PVRSRVCreateVirtualAppHint(&hint);
+    TRACELOG(LOG_INFO, "PVE_PSP2 init OK.\n");
+#endif // SCE_VITA
     TRACELOG(LOG_INFO, "Initializing raylib %s", RAYLIB_VERSION);
 
     if ((title != NULL) && (title[0] != 0)) CORE.Window.title = title;
@@ -770,7 +837,7 @@ void InitWindow(int width, int height, const char *title)
         }
     }
 #endif
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     // Initialize graphics device (display device and OpenGL context)
     // NOTE: returns true if window and graphic device has been initialized successfully
     CORE.Window.ready = InitGraphicsDevice(width, height);
@@ -817,6 +884,30 @@ void InitWindow(int width, int height, const char *title)
     InitEvdevInput();   // Evdev inputs initialization
     InitGamepad();      // Gamepad init
     InitKeyboard();     // Keyboard init (stdin)
+#endif
+
+#if defined(PLATFORM_NX)
+    // Configure our supported input layout
+    padConfigureInput(MAX_GAMEPADS, HidNpadStyleSet_NpadStandard);
+    // Initialize the gamepads
+    padInitializeDefault(&CORE.Input.Gamepad.nxPad[0]);
+#endif
+
+#if defined(PLATFORM_SCE_VITA)
+    // Setup input control, Digital buttons + normal analog range
+    // See https://docs.vitasdk.org/group__SceCtrlUser.html
+    sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+    // Enable sampling of the front and rear touch screens
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, 1);
+	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, 1);
+	
+	//SceCtrlData pad;
+	//SceTouchData frontTouch;
+	//SceTouchData rearTouch;
+	//&CORE.Input.Gamepad.pad
+	//&CORE.Input.Gamepad.frontTouch
+	//&CORE.Input.Gamepad.rearTouch
+	
 #endif
 
 #if defined(PLATFORM_WEB)
@@ -882,7 +973,7 @@ void CloseWindow(void)
     timeEndPeriod(1);           // Restore time period
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     // Close surface, context and display
     if (CORE.Window.device != EGL_NO_DISPLAY)
     {
@@ -1001,6 +1092,12 @@ void CloseWindow(void)
 
     CORE.Window.ready = false;
     TRACELOG(LOG_INFO, "Window closed successfully");
+#if defined(PLATFORM_NX) && defined(NX_USB_DEBUGGER)
+    NxUsbDebuggerEnd();
+#endif
+#if defined(PLATFORM_SCE_VITA)
+	// TODO: ? MH_VITA 
+#endif
 }
 
 // Check if KEY_ESCAPE pressed or Close icon pressed
@@ -1032,7 +1129,10 @@ bool WindowShouldClose(void)
     else return true;
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+    #if defined(PLATFORM_NX)
+        if (!appletMainLoop()) return true;
+    #endif
     if (CORE.Window.ready) return CORE.Window.shouldClose;
     else return true;
 #endif
@@ -2636,7 +2736,7 @@ double GetTime(void)
     return glfwGetTime();   // Elapsed time since glfwInit()
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     struct timespec ts = { 0 };
     clock_gettime(CLOCK_MONOTONIC, &ts);
     unsigned long long int time = (unsigned long long int)ts.tv_sec*1000000000LLU + (unsigned long long int)ts.tv_nsec;
@@ -4012,7 +4112,7 @@ static bool InitGraphicsDevice(int width, int height)
 
 #endif  // PLATFORM_DESKTOP || PLATFORM_WEB
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     CORE.Window.fullscreen = true;
     CORE.Window.flags |= FLAG_FULLSCREEN_MODE;
 
@@ -4218,7 +4318,7 @@ static bool InitGraphicsDevice(int width, int height)
         EGL_NONE
     };
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     EGLint numConfigs = 0;
 
     // Get an EGL device connection
@@ -4385,7 +4485,40 @@ static bool InitGraphicsDevice(int width, int height)
     //---------------------------------------------------------------------------------
 #endif  // PLATFORM_RPI
 
-#if defined(PLATFORM_DRM)
+#if defined(PLATFORM_NX)
+    CORE.Window.gbmSurface = nwindowGetDefault();
+    if (appletGetOperationMode() == AppletOperationMode_Console)
+    {
+        CORE.Window.display.width = 1920;
+        CORE.Window.display.height = 1080;
+    }
+    else if (appletGetOperationMode() == AppletOperationMode_Handheld)
+    {
+        CORE.Window.display.width = 1280;
+        CORE.Window.display.height = 720;
+    }
+#endif
+
+#if defined(PLATFORM_SCE_VITA)
+    CORE.Window.display.width = 960;
+    CORE.Window.display.height = 544;
+    
+    CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)0, NULL);
+    if (EGL_NO_SURFACE == CORE.Window.surface)
+    {
+        TRACELOG(LOG_WARNING, "DISPLAY: Failed to create EGL window surface: 0x%04x", eglGetError());
+        return false;
+    }
+
+    // At this point we need to manage render size vs screen size
+    // NOTE: This function use and modify global module variables:
+    //  -> CORE.Window.screen.width/CORE.Window.screen.height
+    //  -> CORE.Window.render.width/CORE.Window.render.height
+    //  -> CORE.Window.screenScale
+    SetupFramebuffer(CORE.Window.display.width, CORE.Window.display.height);
+#endif
+
+#if defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)CORE.Window.gbmSurface, NULL);
     if (EGL_NO_SURFACE == CORE.Window.surface)
     {
@@ -4426,7 +4559,7 @@ static bool InitGraphicsDevice(int width, int height)
 
     // Load OpenGL extensions
     // NOTE: GL procedures address loader is required to load extensions
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     rlLoadExtensions(glfwGetProcAddress);
 #else
     rlLoadExtensions(eglGetProcAddress);
@@ -4635,7 +4768,7 @@ void SwapScreenBuffer(void)
     glfwSwapBuffers(CORE.Window.handle);
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     eglSwapBuffers(CORE.Window.device, CORE.Window.surface);
 
 #if defined(PLATFORM_DRM)
@@ -4687,7 +4820,7 @@ void SwapScreenBuffer(void)
 
     CORE.Window.prevBO = bo;
 #endif  // PLATFORM_DRM
-#endif  // PLATFORM_ANDROID || PLATFORM_RPI || PLATFORM_DRM
+#endif  // PLATFORM_ANDROID || PLATFORM_RPI || PLATFORM_DRM || PLATFORM_NX || PLATFORM_SCE_VITA
 }
 
 // Register all input events
@@ -4946,6 +5079,104 @@ void PollInputEvents(void)
         }
     }
 #endif
+
+#if defined(PLATFORM_SCE_VITA)
+	// Check if gamepads are ready
+    
+	//SceCtrlData pad;
+	//SceTouchData frontTouch;
+	//SceTouchData rearTouch;
+	//&CORE.Input.Gamepad.pad
+	//&CORE.Input.Gamepad.frontTouch
+	//&CORE.Input.Gamepad.rearTouch
+	    
+	// Update Game pad info
+	uint8_t maxVitaPads = MAX_GAMEPADS;
+	if (MAX_GAMEPADS > 5) {
+		maxVitaPads = 5;
+	}
+	if (!sceCtrlIsMultiControllerSupported()) {
+		maxVitaPads = 1;
+	}
+	SceCtrlPortInfo* portInfo;
+	sceCtrlGetControllerPortInfo(portInfo);
+    for (int vPad = 0; vPad < maxVitaPads; vPad++)
+    {
+		if (portInfo->port[vPad] != SCE_CTRL_TYPE_UNPAIRED) {
+			CORE.Input.Gamepad.ready[vPad] = true;
+		}
+    }
+
+    // Register gamepads buttons events
+    for (int i = 0; i < maxVitaPads; i++)
+    {
+        if (CORE.Input.Gamepad.ready[i])     // Check if gamepad is available
+        {		
+            // Get current gamepad state
+			sceCtrlPeekBufferPositive(i, &CORE.Input.Gamepad.pad[i], 1);
+
+            for (int k = 0; k < MAX_GAMEPAD_BUTTONS; k++)
+			{
+				// Register previous gamepad states
+				CORE.Input.Gamepad.previousButtonState[i][k] = CORE.Input.Gamepad.currentButtonState[i][k];
+
+				// Check digital buttons
+                GamepadButton button = -1;
+
+                switch (k)
+                {
+                    case GAMEPAD_BUTTON_RIGHT_FACE_UP: button = 1 << 12; break; // Triangle Bit(12)
+                    case GAMEPAD_BUTTON_RIGHT_FACE_RIGHT: button = 1 << 13; break; // Circle Bit(13)
+                    case GAMEPAD_BUTTON_RIGHT_FACE_DOWN: button = 1 << 14; break; // Cross Bit(14)
+                    case GAMEPAD_BUTTON_RIGHT_FACE_LEFT: button = 1 << 15; break; // Square Bit(15)
+
+                    case GAMEPAD_BUTTON_LEFT_TRIGGER_1: button = 1 << 8; break; // L Bit(8)
+                    case GAMEPAD_BUTTON_RIGHT_TRIGGER_1: button = 1 << 9; break; // R Bit(9)
+
+                    case GAMEPAD_BUTTON_MIDDLE_LEFT: button = 1; break; // Select = Bit(0)
+                    // case GLFW_GAMEPAD_BUTTON_GUIDE: button = GAMEPAD_BUTTON_MIDDLE; break; //PS Button not allowed?
+                    case GAMEPAD_BUTTON_MIDDLE_RIGHT: button = 1 << 3; break; // Start is Bit(3)
+
+                    case GAMEPAD_BUTTON_LEFT_FACE_UP: button = 1 << 4; break; // D_UP Bit(4)
+                    case GAMEPAD_BUTTON_LEFT_FACE_RIGHT: button = 1 << 5; break; // D_Right Bit(5)
+                    case GAMEPAD_BUTTON_LEFT_FACE_DOWN: button = 1 << 6; break; // D_Down Bit(6)
+                    case GAMEPAD_BUTTON_LEFT_FACE_LEFT: button = 1 << 7; break; // D_Left Bit(7)
+
+                    //case GLFW_GAMEPAD_BUTTON_LEFT_THUMB: button = GAMEPAD_BUTTON_LEFT_THUMB; break; // No left thumb btn
+                    //case GLFW_GAMEPAD_BUTTON_RIGHT_THUMB: button = GAMEPAD_BUTTON_RIGHT_THUMB; break; // No right thumb btn
+                    default: break;
+                }
+
+                if (button != -1)   // Check for valid button
+                {
+                    if (CORE.Input.Gamepad.pad[i].buttons & button)
+                    {
+                        CORE.Input.Gamepad.currentButtonState[i][k] = 1;
+                        CORE.Input.Gamepad.lastButtonPressed = k;
+                    }
+                    else CORE.Input.Gamepad.currentButtonState[i][k] = 0;
+                }
+            }
+
+            // Get current axis state
+            // TODO: MH_VITA check if GLFW "just works"?
+			//CORE.Input.Gamepad.pad[i].lx;
+			//CORE.Input.Gamepad.pad[i].ly;
+			//CORE.Input.Gamepad.pad[i].rx;
+			//CORE.Input.Gamepad.pad[i].ry;
+
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_X] = (float)kAxisL.x / 32767.0f;
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_Y] = (float)kAxisL.y / 32767.0f;
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_X] = (float)kAxisR.x / 32767.0f;
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_Y] = (float)kAxisR.y / 32767.0f;
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_TRIGGER] = (kHeld & HidNpadButton_ZL) ? 1.0f : 0.0f;
+			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_TRIGGER] = (kHeld & HidNpadButton_ZR) ? 1.0f : 0.0f;
+            //CORE.Input.Gamepad.axisCount = GLFW_GAMEPAD_AXIS_LAST + 1;
+        }
+    }
+
+    CORE.Window.resizedLastFrame = false;
+#endif // PLATFORM_SCE_VITA
 
 #if (defined(PLATFORM_RPI) || defined(PLATFORM_DRM)) && defined(SUPPORT_SSH_KEYBOARD_RPI)
     // NOTE: Keyboard reading could be done using input_event(s) or just read from stdin, both methods are used here.

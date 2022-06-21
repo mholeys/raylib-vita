@@ -36,6 +36,40 @@ elseif (${PLATFORM} MATCHES "Web")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 --profiling")
     set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
 
+elseif (${PLATFORM} MATCHES "Vita")
+
+    if(DEFINED ENV{VITASDK})
+      set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
+    else()
+      message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
+    endif()
+    set(PLATFORM_CPP "PLATFORM_SCE_VITA")
+    set(GRAPHICS "GRAPHICS_API_OPENGL_ES2")
+    include("/usr/local/vitasdk/share/vita.cmake" REQUIRED)
+
+    set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d PARENTAL_LEVEL=1")
+    set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d ATTRIBUTE2=12")
+#    target_link_libraries(${PROJECT_NAME}
+#      #SCE
+#      SceCtrl_stub
+#      SceDisplay_stub
+#
+#      #PVR_PSP2
+#      libIMGEGL_stub_weak
+#      libgpu_es4_ext_stub_weak
+#      libGLESv2_stub_weak
+#      m
+#    )
+
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 --profiling")
+#    set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
+    include_directories(/usr/local/vitasdk/arm-vita-eabi/include)
+    find_library(GLESV2 HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
+    find_library(EGL HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
+#    find_library(BCMHOST bcm_host HINTS /opt/vc/lib)
+    set(LIBS_PRIVATE ${GLESV2} ${EGL} SceCtrl_stub SceDisplay_stub SceTouch_stub libIMGEGL_stub_weak libgpu_es4_ext_stub_weak libGLESv2_stub_weak pthread rt m dl)
+
+
 elseif (${PLATFORM} MATCHES "Android")
     set(PLATFORM_CPP "PLATFORM_ANDROID")
     set(GRAPHICS "GRAPHICS_API_OPENGL_ES2")
