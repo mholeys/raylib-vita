@@ -106,6 +106,10 @@ elseif (${PLATFORM} MATCHES "Web")
     # does not generate HTML+JS+WASM files, only a non-working
     # and fat HTML
     string(REPLACE "-rdynamic" "" CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS}")
+elseif (${PLATFORM} MATCHES "Vita")
+    # Remove the -rdynamic flag because it fails with vitasdk
+    string(REPLACE "-rdynamic" "" CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS}")
+
 endif ()
 
 include_directories(BEFORE SYSTEM others/external/include)

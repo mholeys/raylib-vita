@@ -43,6 +43,8 @@ elseif (${PLATFORM} MATCHES "Vita")
     else()
       message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
     endif()
+    
+
     set(PLATFORM_CPP "PLATFORM_SCE_VITA")
     set(GRAPHICS "GRAPHICS_API_OPENGL_ES2")
     include("/usr/local/vitasdk/share/vita.cmake" REQUIRED)
@@ -64,10 +66,12 @@ elseif (${PLATFORM} MATCHES "Vita")
 #    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s USE_GLFW=3 -s ASSERTIONS=1 --profiling")
 #    set(CMAKE_STATIC_LIBRARY_SUFFIX ".a")
     include_directories(/usr/local/vitasdk/arm-vita-eabi/include)
-    find_library(GLESV2 HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
-    find_library(EGL HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
+    link_directories(/usr/local/vitasdk/arm-vita-eabi/lib)
+#    find_library(GLESV2  HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
+#    find_library(EGL HINTS /usr/local/vitasdk/arm-vita-eabi/include/)
+
 #    find_library(BCMHOST bcm_host HINTS /opt/vc/lib)
-    set(LIBS_PRIVATE ${GLESV2} ${EGL} SceCtrl_stub SceDisplay_stub SceTouch_stub libIMGEGL_stub_weak libgpu_es4_ext_stub_weak libGLESv2_stub_weak pthread rt m dl)
+    set(LIBS_PRIVATE glfw3 SceCtrl_stub SceDisplay_stub SceTouch_stub libIMGEGL_stub_weak libgpu_es4_ext_stub_weak libGLESv2_stub_weak pthread m dl)
 
 
 elseif (${PLATFORM} MATCHES "Android")

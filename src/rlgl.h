@@ -745,9 +745,9 @@ RLAPI void rlLoadDrawQuad(void);     // Load and draw a quad
 #if defined(GRAPHICS_API_OPENGL_ES2)
 #define GL_GLEXT_PROTOTYPES
 	#if defined(PLATFORM_SCE_VITA)
-		#include <PVR_PSP2/EGL/egl.h>
-		#include <PVR_PSP2/EGL/eglext.h>
-		#include <PVR_PSP2/GLES2/gl2.h>
+		#include <EGL/eglplatform.h>
+		#include <EGL/egl.h>
+		//#include <EGL/eglext.h>
 	#endif
 	//#include <EGL/egl.h>              // EGL library -> not required, platform layer
 	#include <GLES2/gl2.h>              // OpenGL ES 2.0 library

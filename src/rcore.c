@@ -287,22 +287,25 @@
 #endif
 
 #if defined(PLATFORM_SCE_VITA)
-	#include <psp2/types.h>
-	
     #include <psp2/kernel/modulemgr.h>
     #include <psp2/kernel/processmgr.h>
-    #include <psp2/kernel/clib.h>
-	#include <psp2/touch.h> 
-    #include <psp2/ctrl.h>    
-
-    #include <PVR_PSP2/EGL/egl.h>
-    #include <PVR_PSP2/EGL/eglext.h>
-    #include <PVR_PSP2/GLES2/gl2.h>
-    
-    #include <PVR_PSP2/EGL/eglplatform.h>
-    #include <PVR_PSP2/gpu_es4/psp2_pvr_hint.h>
-    #include <PVR_PSP2/GLES2/gl2ext.h>
+	#include <psp2/kernel/clib.h>
+	#include <psp2/types.h>
 	
+	#define GLFW_INCLUDE_ES2
+	#include "GLFW/glfw3.h"
+	
+    ////#include <EGL/eglplatform.h>
+    //#include <EGL/egl.h>
+	//#include <EGL/eglext.h>
+	#include <gpu_es4/psp2_pvr_hint.h>
+    //#include <GLES2/gl2.h>
+	////#include <GLES2/gl2ext.h>
+	
+	#include <psp2/touch.h> 
+    #include <psp2/ctrl.h>
+    
+    //#include <GLES2/gl2ext.h>	
 #endif
 
 //----------------------------------------------------------------------------------
@@ -2732,11 +2735,11 @@ float GetFrameTime(void)
 // NOTE: On PLATFORM_DESKTOP, timer is initialized on glfwInit()
 double GetTime(void)
 {
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     return glfwGetTime();   // Elapsed time since glfwInit()
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     struct timespec ts = { 0 };
     clock_gettime(CLOCK_MONOTONIC, &ts);
     unsigned long long int time = (unsigned long long int)ts.tv_sec*1000000000LLU + (unsigned long long int)ts.tv_nsec;
@@ -5121,7 +5124,7 @@ void PollInputEvents(void)
 				CORE.Input.Gamepad.previousButtonState[i][k] = CORE.Input.Gamepad.currentButtonState[i][k];
 
 				// Check digital buttons
-                GamepadButton button = -1;
+                uint32_t button = -1;
 
                 switch (k)
                 {

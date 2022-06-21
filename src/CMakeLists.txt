@@ -111,6 +111,11 @@ else ()
     message(STATUS "Generated config types: ${CMAKE_CONFIGURATION_TYPES}")
 endif ()
 
+if (${PLATFORM} MATCHES "Vita")
+    # Remove the -rdynamic flag because it fails with vitasdk
+    string(REPLACE "-rdynamic" "" CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "${CMAKE_SHARED_LIBRARY_LINK_C_FLAGS}")
+endif ()
+
 message(STATUS "Compiling with the flags:")
 message(STATUS "  PLATFORM=" ${PLATFORM_CPP})
 message(STATUS "  GRAPHICS=" ${GRAPHICS})
