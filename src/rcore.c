@@ -754,19 +754,27 @@ void InitWindow(int width, int height, const char *title)
     NxUsbDebuggerInit();
 #endif
 #if defined(PLATFORM_SCE_VITA)
+	printf("\n[MH][Raylib]: Loading modules\n");
 	// Load needed modules
 	sceKernelLoadStartModule("vs0:sys/external/libfios2.suprx", 0, NULL, 0, NULL, NULL); // File IO
+	printf("\n[MH][Raylib]: Loaded libfios2\n");
     sceKernelLoadStartModule("vs0:sys/external/libc.suprx", 0, NULL, 0, NULL, NULL); 
+	printf("\n[MH][Raylib]: Loaded libc\n");
     sceKernelLoadStartModule("app0:module/libgpu_es4_ext.suprx", 0, NULL, 0, NULL, NULL);
+	printf("\n[MH][Raylib]: Loaded libgpu_es4_ext\n");
     sceKernelLoadStartModule("app0:module/libIMGEGL.suprx", 0, NULL, 0, NULL, NULL);
+	printf("\n[MH][Raylib]: Loaded libIMGEGL\n");
     TRACELOG(LOG_INFO, "SCE Module init OK\n");
+	printf("\n[MH][Raylib]: SCE Module init OK\n");
 
     PVRSRV_PSP2_APPHINT hint;
     PVRSRVInitializeAppHint(&hint);
     PVRSRVCreateVirtualAppHint(&hint);
     TRACELOG(LOG_INFO, "PVE_PSP2 init OK.\n");
+	printf("\n[MH][Raylib]: PVE_PSP2 init OK.\n");
 #endif // SCE_VITA
     TRACELOG(LOG_INFO, "Initializing raylib %s", RAYLIB_VERSION);
+	printf("\n[MH][Raylib]: Initializing raylib %s.\n", RAYLIB_VERSION);
 
     if ((title != NULL) && (title[0] != 0)) CORE.Window.title = title;
 
@@ -843,8 +851,9 @@ void InitWindow(int width, int height, const char *title)
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     // Initialize graphics device (display device and OpenGL context)
     // NOTE: returns true if window and graphic device has been initialized successfully
+	printf("\n[MH][Raylib]: InitGraphicsDevice called\n");
     CORE.Window.ready = InitGraphicsDevice(width, height);
-
+	printf("\n[MH][Raylib]: InitGraphicsDevice finished\n");
     // If graphic device is no properly initialized, we end program
     if (!CORE.Window.ready)
     {
@@ -4290,6 +4299,7 @@ static bool InitGraphicsDevice(int width, int height)
     EGLint sampleBuffer = 0;
     if (CORE.Window.flags & FLAG_MSAA_4X_HINT)
     {
+		printf("\n[MH][Raylib]: InitGraphicsDevice MSAA x4\n");
         samples = 4;
         sampleBuffer = 1;
         TRACELOG(LOG_INFO, "DISPLAY: Trying to enable MSAA x4");
@@ -4328,10 +4338,13 @@ static bool InitGraphicsDevice(int width, int height)
 #if defined(PLATFORM_DRM)
     CORE.Window.device = eglGetDisplay((EGLNativeDisplayType)CORE.Window.gbmDevice);
 #else
+	printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay\n");
     CORE.Window.device = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay done\n");
 #endif
     if (CORE.Window.device == EGL_NO_DISPLAY)
     {
+		printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay failed\n");
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to initialize EGL device");
         return false;
     }
@@ -4340,6 +4353,7 @@ static bool InitGraphicsDevice(int width, int height)
     if (eglInitialize(CORE.Window.device, NULL, NULL) == EGL_FALSE)
     {
         // If all of the calls to eglInitialize returned EGL_FALSE then an error has occurred.
+		printf("\n[MH][Raylib]: InitGraphicsDevice Failed to initialize EGL device\n");
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to initialize EGL device");
         return false;
     }
@@ -4403,13 +4417,18 @@ static bool InitGraphicsDevice(int width, int height)
 #endif
 
     // Set rendering API
+	printf("\n[MH][Raylib]: InitGraphicsDevice eglBindApi\n");
     eglBindAPI(EGL_OPENGL_ES_API);
-
+	printf("\n[MH][Raylib]: InitGraphicsDevice eglBindApi done\n");
+	
     // Create an EGL rendering context
+	printf("\n[MH][Raylib]: InitGraphicsDevice egl context\n");
     CORE.Window.context = eglCreateContext(CORE.Window.device, CORE.Window.config, EGL_NO_CONTEXT, contextAttribs);
+	printf("\n[MH][Raylib]: InitGraphicsDevice egl context done\n");
     if (CORE.Window.context == EGL_NO_CONTEXT)
     {
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to create EGL context");
+		printf("\n[MH][Raylib]: InitGraphicsDevice Failed to create EGL context\n");
         return false;
     }
 #endif
@@ -4506,9 +4525,12 @@ static bool InitGraphicsDevice(int width, int height)
     CORE.Window.display.width = 960;
     CORE.Window.display.height = 544;
     
+	printf("\n[MH][Raylib]: InitGraphicsDevice creating surface\n");
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)0, NULL);
+	printf("\n[MH][Raylib]: InitGraphicsDevice creating surface done\n");
     if (EGL_NO_SURFACE == CORE.Window.surface)
     {
+		printf("\n[MH][Raylib]: InitGraphicsDevice creating surface failed 0x%04x\n", eglGetError());
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to create EGL window surface: 0x%04x", eglGetError());
         return false;
     }

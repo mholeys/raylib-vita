@@ -292,7 +292,7 @@ ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
     endif
 	
     CC = $(VITASDK)/bin/arm-vita-eabi-gcc
-	CXX = $(VITASDK)/bin/arm-vita-eabi-g++
+    CXX = $(VITASDK)/bin/arm-vita-eabi-g++
     AR = $(VITASDK)/bin/arm-vita-eabi-gcc-ar
 #TODO: MH_VITA
 endif

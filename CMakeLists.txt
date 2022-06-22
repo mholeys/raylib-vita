@@ -25,9 +25,9 @@ include(BuildOptions)
 # Main sources directory (the second parameter sets the output directory name to raylib)
 add_subdirectory(src raylib)
 
-if (${BUILD_EXAMPLES})
-  MESSAGE(STATUS "Building examples is enabled")
-  add_subdirectory(examples)
-endif()
+#if (${BUILD_EXAMPLES})
+#  MESSAGE(STATUS "Building examples is enabled")
+#  add_subdirectory(examples)
+#endif()
 
 enable_testing()

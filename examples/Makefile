@@ -424,7 +424,8 @@ ifeq ($(PLATFORM),PLATFORM_NX)
     LDLIBS = -lraylib -lEGL -lGLESv2 -lglapi -ldrm_nouveau -lnx -lm 
 endif
 ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
-    LDLIBS = -lraylib -lPVR_PSP2 -lEGL -lGLESv2 -lEGL -lpthread
+    LDLIBS = -lraylib -lpthread -lglfw3 -lSceCtrl_stub -lSceDisplay_stub -lSceTouch_stub -llibIMGEGL_stub_weak -llibgpu_es4_ext_stub_weak -llibGLESv2_stub_weak -lm -ldl
+	#-lPVR_PSP2 -lEGL -lGLESv2 -lEGL 
 endif
 
 
