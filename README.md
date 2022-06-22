@@ -8,6 +8,39 @@ raylib is highly inspired by Borland BGI graphics lib and by XNA framework and i
 
 Ready to learn? Jump to [code examples!](http://www.raylib.com/examples.html)
 
+
+# PS VITA 
+To build/install you will need [VITASDK](https://vitasdk.org/) [PVR_PSP2](https://github.com/GrapheneCt/PVR_PSP2) [GLFW-vita](https://github.com/SonicMastr/glfw-vita)
+
+To install PVR_PSP2:
+- Download the latest release (currently 3.8), you will need the vitasdk_stubs and either debug/release zips
+- copy all .a files that are in the vitasdk_stubs zip, to `$VITASDK/arm-vita-eabi/lib`
+- copy all .a files from PSVITA_Debug/Release.zip directly into `$VITASDK/arm-vita-eabi/lib` 
+- use the .suprx files from this zip in your modules folder for your app
+
+To install GLFW-vita:
+- clone the repo
+- Run `makedir build`
+- Run `cmake -Bbuild -DVITASDK=ON -DCMAKE_BUILD_TYPE=Release`
+- Run `cd build`
+- Run `make install`
+- There is a note in the GLFW-vita github README that "Note: When using VitaSDK, it is necessary to link with pthread"
+- I have found that you may need to do this, to do so edit the CMakeList.txt in the GLFW-vita repo folder to include the following before the line `link_directories`
+  ```
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+  find_package(Threads REQUIRED)
+  ```
+I have managed to get this to compile RayLib using the above methods, but no application produced as of yet
+Stumbling on storeThread within GLFW-vita as this seems to have been build for using the SceDevkit
+
+Compile:
+- Run `mkdir build && cd build`
+- Run `cmake .. -DPLATFORM=Vita -DCMAKE_TOOLCHAIN_FILE=$VITASDK/share/vita.toolchain.cmake -DCMAKE_VERBOSE_MAKEFILE=ON`
+- Run `make`
+
+To install to vitasdk:
+- Run `make install`
+
 ---
 
 <br>
