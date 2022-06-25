@@ -395,14 +395,14 @@ typedef struct { unsigned int width; unsigned int height; } Size;
 // Core global state context data
 typedef struct CoreData {
     struct {
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
         GLFWwindow *handle;                 // GLFW window handle (graphic device)
 #endif
 #if defined(PLATFORM_RPI)
         EGL_DISPMANX_WINDOW_T handle;       // Native window handle (graphic device)
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
 #if defined(PLATFORM_DRM)
         int fd;                             // File descriptor for /dev/dri/...
         drmModeConnector *connector;        // Direct Rendering Manager (DRM) mode connector
@@ -498,6 +498,11 @@ typedef struct CoreData {
             Vector2 position[MAX_TOUCH_POINTS];         // Touch position on screen
             char currentTouchState[MAX_TOUCH_POINTS];   // Registers current touch state
             char previousTouchState[MAX_TOUCH_POINTS];  // Registers previous touch state
+#if defined (PLATFORM_SCE_VITA)
+			// SEE  https://docs.vitasdk.org/group__SceCtrlUser.html     
+			SceTouchData frontTouch[MAX_GAMEPADS]; // Front touch screen state
+	        SceTouchData rearTouch[MAX_GAMEPADS]; // Read touch screen state
+#endif
         } Touch;
         struct {
             int lastButtonPressed;          // Register last gamepad button pressed
@@ -516,10 +521,8 @@ typedef struct CoreData {
             PadState nxPad[MAX_GAMEPADS];   // Gamepad state holder
 #endif
 #if defined (PLATFORM_SCE_VITA)
-      // TODO: MH_VITA SEE  https://docs.vitasdk.org/group__SceCtrlUser.html     
+			// SEE  https://docs.vitasdk.org/group__SceCtrlUser.html     
             SceCtrlData pad[MAX_GAMEPADS]; // Gamepad state
-            SceTouchData frontTouch[MAX_GAMEPADS]; // Front touch screen state
-	        SceTouchData rearTouch[MAX_GAMEPADS]; // Read touch screen state
 #endif
         } Gamepad;
     } Input;
@@ -767,7 +770,7 @@ void InitWindow(int width, int height, const char *title)
     sceKernelLoadStartModule("vs0:sys/external/libc.suprx", 0, NULL, 0, NULL, NULL); 
     sceKernelLoadStartModule("app0:module/libgpu_es4_ext.suprx", 0, NULL, 0, NULL, NULL);
     sceKernelLoadStartModule("app0:module/libIMGEGL.suprx", 0, NULL, 0, NULL, NULL);
-    TRACELOG(LOG_INFO, "SCE Module init OK\n");
+    TRACELOG(LOG_INFO, "SCE Module load OK\n");
 
     PVRSRV_PSP2_APPHINT hint;
     PVRSRVInitializeAppHint(&hint);
@@ -915,8 +918,8 @@ void InitWindow(int width, int height, const char *title)
 	//SceTouchData frontTouch;
 	//SceTouchData rearTouch;
 	//&CORE.Input.Gamepad.pad
-	//&CORE.Input.Gamepad.frontTouch
-	//&CORE.Input.Gamepad.rearTouch
+	//&CORE.Input.Touch.frontTouch
+	//&CORE.Input.Touch.rearTouch
 	
 #endif
 
@@ -953,7 +956,7 @@ void InitWindow(int width, int height, const char *title)
     CORE.Time.frameCounter = 0;
 #endif
 
-#endif        // PLATFORM_DESKTOP || PLATFORM_WEB || PLATFORM_RPI || PLATFORM_DRM
+#endif        // PLATFORM_DESKTOP || PLATFORM_WEB || PLATFORM_RPI || PLATFORM_DRM || PLATFORM_SCE_VITA
 }
 
 // Close window and unload OpenGL context
@@ -974,7 +977,7 @@ void CloseWindow(void)
 
     rlglClose();                // De-init rlgl
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     glfwDestroyWindow(CORE.Window.handle);
     glfwTerminate();
 #endif
@@ -983,7 +986,7 @@ void CloseWindow(void)
     timeEndPeriod(1);           // Restore time period
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_NX)
     // Close surface, context and display
     if (CORE.Window.device != EGL_NO_DISPLAY)
     {
@@ -1686,7 +1689,6 @@ void *GetWindowHandle(void)
     // NOTE: Returned handle is: (objc_object *)
     return NULL;    // TODO: return (void *)glfwGetCocoaWindow(window);
 #endif
-
     return NULL;
 }
 
@@ -3649,7 +3651,7 @@ bool IsMouseButtonUp(int button)
 // Get mouse position X
 int GetMouseX(void)
 {
-#if defined(PLATFORM_ANDROID)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_SCE_VITA)
     return (int)CORE.Input.Touch.position[0].x;
 #else
     return (int)((CORE.Input.Mouse.currentPosition.x + CORE.Input.Mouse.offset.x)*CORE.Input.Mouse.scale.x);
@@ -3659,7 +3661,7 @@ int GetMouseX(void)
 // Get mouse position Y
 int GetMouseY(void)
 {
-#if defined(PLATFORM_ANDROID)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_SCE_VITA)
     return (int)CORE.Input.Touch.position[0].y;
 #else
     return (int)((CORE.Input.Mouse.currentPosition.y + CORE.Input.Mouse.offset.y)*CORE.Input.Mouse.scale.y);
@@ -3671,7 +3673,7 @@ Vector2 GetMousePosition(void)
 {
     Vector2 position = { 0 };
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     position = GetTouchPosition(0);
 #else
     position.x = (CORE.Input.Mouse.currentPosition.x + CORE.Input.Mouse.offset.x)*CORE.Input.Mouse.scale.x;
@@ -3719,7 +3721,7 @@ void SetMouseScale(float scaleX, float scaleY)
 // Get mouse wheel movement Y
 float GetMouseWheelMove(void)
 {
-#if defined(PLATFORM_ANDROID)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_SCE_VITA)
     return 0.0f;
 #endif
 #if defined(PLATFORM_WEB)
@@ -3747,7 +3749,7 @@ void SetMouseCursor(int cursor)
 // Get touch position X for touch point 0 (relative to screen size)
 int GetTouchX(void)
 {
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     return (int)CORE.Input.Touch.position[0].x;
 #else   // PLATFORM_DESKTOP, PLATFORM_RPI, PLATFORM_DRM
     return GetMouseX();
@@ -3757,7 +3759,7 @@ int GetTouchX(void)
 // Get touch position Y for touch point 0 (relative to screen size)
 int GetTouchY(void)
 {
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     return (int)CORE.Input.Touch.position[0].y;
 #else   // PLATFORM_DESKTOP, PLATFORM_RPI, PLATFORM_DRM
     return GetMouseY();
@@ -3770,7 +3772,7 @@ Vector2 GetTouchPosition(int index)
 {
     Vector2 position = { -1.0f, -1.0f };
 
-#if defined(PLATFORM_DESKTOP)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_SCE_VITA)
     // TODO: GLFW does not support multi-touch input just yet
     // https://www.codeproject.com/Articles/668404/Programming-for-Multi-Touch
     // https://docs.microsoft.com/en-us/windows/win32/wintouch/getting-started-with-multi-touch-messages
@@ -3833,10 +3835,10 @@ static bool InitGraphicsDevice(int width, int height)
     // ...in top-down or left-right to match display aspect ratio (no weird scalings)
 
 #if defined(PLATFORM_SCE_VITA)
-    glfwSetErrorCallback(ErrorCallback);
+//    glfwSetErrorCallback(ErrorCallback);
 #endif
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     glfwSetErrorCallback(ErrorCallback);
 /*
     // TODO: Setup GLFW custom allocators to match raylib ones
@@ -3882,6 +3884,12 @@ static bool InitGraphicsDevice(int width, int height)
     CORE.Window.display.width = CORE.Window.screen.width;
     CORE.Window.display.height = CORE.Window.screen.height;
 #endif  // PLATFORM_WEB
+
+#if defined(PLATFORM_SCE_VITA)
+    CORE.Window.display.width = CORE.Window.screen.width;
+    CORE.Window.display.height = CORE.Window.screen.height;
+#endif  // PLATFORM_SCE_VITA
+
 
     glfwDefaultWindowHints();                       // Set default windows hints
     //glfwWindowHint(GLFW_RED_BITS, 8);             // Framebuffer red color component bits
@@ -4078,6 +4086,7 @@ static bool InitGraphicsDevice(int width, int height)
     }
 
     // Set window callback events
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
     glfwSetWindowSizeCallback(CORE.Window.handle, WindowSizeCallback);      // NOTE: Resizing not allowed by default!
 #if !defined(PLATFORM_WEB)
     glfwSetWindowMaximizeCallback(CORE.Window.handle, WindowMaximizeCallback);
@@ -4092,6 +4101,7 @@ static bool InitGraphicsDevice(int width, int height)
     glfwSetCursorPosCallback(CORE.Window.handle, MouseCursorPosCallback);   // Track mouse position changes
     glfwSetScrollCallback(CORE.Window.handle, MouseScrollCallback);
     glfwSetCursorEnterCallback(CORE.Window.handle, CursorEnterCallback);
+#endif
 
     glfwMakeContextCurrent(CORE.Window.handle);
 
@@ -4141,7 +4151,7 @@ static bool InitGraphicsDevice(int width, int height)
 
 #endif  // PLATFORM_DESKTOP || PLATFORM_WEB
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     CORE.Window.fullscreen = true;
     CORE.Window.flags |= FLAG_FULLSCREEN_MODE;
 
@@ -4347,7 +4357,7 @@ static bool InitGraphicsDevice(int width, int height)
         EGL_NONE
     };
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     EGLint numConfigs = 0;
 
     // Get an EGL device connection
@@ -4528,7 +4538,7 @@ static bool InitGraphicsDevice(int width, int height)
     }
 #endif
 
-#if defined(PLATFORM_SCE_VITA)
+/* #if defined(PLATFORM_SCE_VITA)
     CORE.Window.display.width = 960;
     CORE.Window.display.height = 544;
 
@@ -4541,11 +4551,11 @@ static bool InitGraphicsDevice(int width, int height)
 
     // At this point we need to manage render size vs screen size
     // NOTE: This function use and modify global module variables:
-    //  -> CORE.Window.screen.width/CORE.Window.screen.height
-    //  -> CORE.Window.render.width/CORE.Window.render.height
-    //  -> CORE.Window.screenScale
+     // -> CORE.Window.screen.width/CORE.Window.screen.height
+     // -> CORE.Window.render.width/CORE.Window.render.height
+     // -> CORE.Window.screenScale
     SetupFramebuffer(CORE.Window.display.width, CORE.Window.display.height);
-#endif
+#endif */
 
 #if defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)CORE.Window.gbmSurface, NULL);
@@ -4603,6 +4613,10 @@ static bool InitGraphicsDevice(int width, int height)
     SetupViewport(CORE.Window.currentFbo.width, CORE.Window.currentFbo.height);
 
     ClearBackground(RAYWHITE);      // Default background color for raylib games :P
+
+#if defined(PLATFORM_SCE_VITA)
+    CORE.Window.ready = true;
+#endif
 
 #if defined(PLATFORM_ANDROID)
     CORE.Window.ready = true;
@@ -4793,11 +4807,11 @@ void WaitTime(float ms)
 // Swap back buffer with front buffer (screen drawing)
 void SwapScreenBuffer(void)
 {
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
     glfwSwapBuffers(CORE.Window.handle);
 #endif
 
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     eglSwapBuffers(CORE.Window.device, CORE.Window.surface);
 
 #if defined(PLATFORM_DRM)
@@ -5117,8 +5131,8 @@ void PollInputEvents(void)
 	//SceTouchData frontTouch;
 	//SceTouchData rearTouch;
 	//&CORE.Input.Gamepad.pad
-	//&CORE.Input.Gamepad.frontTouch
-	//&CORE.Input.Gamepad.rearTouch
+	//&CORE.Input.Touch.frontTouch
+	//&CORE.Input.Touch.rearTouch
 	    
 	// Update Game pad info
 	uint8_t maxVitaPads = 1;
