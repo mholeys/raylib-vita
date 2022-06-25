@@ -171,6 +171,10 @@
     #define _POSIX_C_SOURCE 199309L // Required for: CLOCK_MONOTONIC if compiled with c99 without gnu ext.
 #endif
 
+#if defined(PLATFORM_SCE_VITA)
+	#include <psp2/kernel/clib.h> 
+#endif
+
 #include <stdlib.h>                 // Required for: srand(), rand(), atexit()
 #include <stdio.h>                  // Required for: sprintf() [Used in OpenURL()]
 #include <string.h>                 // Required for: strrchr(), strcmp(), strlen()
@@ -291,17 +295,17 @@
     #include <psp2/kernel/processmgr.h>
 	#include <psp2/kernel/clib.h>
 	#include <psp2/types.h>
-	
+
 	#define GLFW_INCLUDE_ES2
 	#include "GLFW/glfw3.h"
-	
+
     ////#include <EGL/eglplatform.h>
     //#include <EGL/egl.h>
 	//#include <EGL/eglext.h>
 	#include <gpu_es4/psp2_pvr_hint.h>
     //#include <GLES2/gl2.h>
 	////#include <GLES2/gl2ext.h>
-	
+
 	#include <psp2/touch.h> 
     #include <psp2/ctrl.h>
     
@@ -526,7 +530,7 @@ typedef struct CoreData {
         double draw;                        // Time measure for frame draw
         double frame;                       // Time measure for one frame
         double target;                      // Desired time for one frame, if 0 not applied
-#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)  || defined(PLATFORM_VITA_SCE)
+#if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)  || defined(PLATFORM_SCE_VITA)
         unsigned long long base;            // Base time measure for hi-res timer
 #endif
         unsigned int frameCounter;          // Frame counter
@@ -655,6 +659,10 @@ static bool InitGraphicsDevice(int width, int height);  // Initialize graphics d
 static void SetupFramebuffer(int width, int height);    // Setup main framebuffer
 static void SetupViewport(int width, int height);       // Set viewport for a provided width and height
 
+#if defined(PLATFORM_SCE_VITA)
+static void ErrorCallback(int error, const char *description);                             // GLFW3 Error Callback, runs on GLFW3 error
+#endif
+
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
 static void ErrorCallback(int error, const char *description);                             // GLFW3 Error Callback, runs on GLFW3 error
 // Window callbacks events
@@ -754,27 +762,19 @@ void InitWindow(int width, int height, const char *title)
     NxUsbDebuggerInit();
 #endif
 #if defined(PLATFORM_SCE_VITA)
-	printf("\n[MH][Raylib]: Loading modules\n");
 	// Load needed modules
-	sceKernelLoadStartModule("vs0:sys/external/libfios2.suprx", 0, NULL, 0, NULL, NULL); // File IO
-	printf("\n[MH][Raylib]: Loaded libfios2\n");
+    sceKernelLoadStartModule("vs0:sys/external/libfios2.suprx", 0, NULL, 0, NULL, NULL); // File IO
     sceKernelLoadStartModule("vs0:sys/external/libc.suprx", 0, NULL, 0, NULL, NULL); 
-	printf("\n[MH][Raylib]: Loaded libc\n");
     sceKernelLoadStartModule("app0:module/libgpu_es4_ext.suprx", 0, NULL, 0, NULL, NULL);
-	printf("\n[MH][Raylib]: Loaded libgpu_es4_ext\n");
     sceKernelLoadStartModule("app0:module/libIMGEGL.suprx", 0, NULL, 0, NULL, NULL);
-	printf("\n[MH][Raylib]: Loaded libIMGEGL\n");
     TRACELOG(LOG_INFO, "SCE Module init OK\n");
-	printf("\n[MH][Raylib]: SCE Module init OK\n");
 
     PVRSRV_PSP2_APPHINT hint;
     PVRSRVInitializeAppHint(&hint);
     PVRSRVCreateVirtualAppHint(&hint);
     TRACELOG(LOG_INFO, "PVE_PSP2 init OK.\n");
-	printf("\n[MH][Raylib]: PVE_PSP2 init OK.\n");
 #endif // SCE_VITA
-    TRACELOG(LOG_INFO, "Initializing raylib %s", RAYLIB_VERSION);
-	printf("\n[MH][Raylib]: Initializing raylib %s.\n", RAYLIB_VERSION);
+    TRACELOG(LOG_INFO, "Initializing raylib %s\n", RAYLIB_VERSION);
 
     if ((title != NULL) && (title[0] != 0)) CORE.Window.title = title;
 
@@ -851,9 +851,7 @@ void InitWindow(int width, int height, const char *title)
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX) || defined(PLATFORM_SCE_VITA)
     // Initialize graphics device (display device and OpenGL context)
     // NOTE: returns true if window and graphic device has been initialized successfully
-	printf("\n[MH][Raylib]: InitGraphicsDevice called\n");
     CORE.Window.ready = InitGraphicsDevice(width, height);
-	printf("\n[MH][Raylib]: InitGraphicsDevice finished\n");
     // If graphic device is no properly initialized, we end program
     if (!CORE.Window.ready)
     {
@@ -2036,9 +2034,11 @@ void BeginDrawing(void)
 // End canvas drawing and swap buffers (double buffering)
 void EndDrawing(void)
 {
+	sceClibPrintf("[RLCore][MH] End drawing called\n");
     rlDrawRenderBatchActive();      // Update and draw internal render batch
-
+	sceClibPrintf("[RLCore][MH] rlDrawRenderBatchActive done\n");
 #if defined(SUPPORT_MOUSE_CURSOR_POINT)
+	sceClibPrintf("[RLCore][MH] SUPPORT_MOUSE_CURSOR_POINT\n");
     // Draw a small rectangle on mouse position for user reference
     if (!CORE.Input.Mouse.cursorHidden)
     {
@@ -2048,6 +2048,7 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_GIF_RECORDING)
+	sceClibPrintf("[RLCore][MH] SUPPORT_GIF_RECORDING\n");
     // Draw record indicator
     if (gifRecording)
     {
@@ -2076,6 +2077,7 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_EVENTS_AUTOMATION)
+	sceClibPrintf("[RLCore][MH] SUPPORT_EVENTS_AUTOMATION\n");
     // Draw record/play indicator
     if (eventsRecording)
     {
@@ -2104,8 +2106,11 @@ void EndDrawing(void)
 #endif
 
 #if !defined(SUPPORT_CUSTOM_FRAME_CONTROL)
+	sceClibPrintf("[RLCore][MH] SUPPORT_CUSTOM_FRAME_CONTROL\n");
     SwapScreenBuffer();                  // Copy back buffer to front buffer (screen)
-
+	
+	sceClibPrintf("[RLCore][MH] SwapScreenBuffer done\n");
+	
     // Frame time control system
     CORE.Time.current = GetTime();
     CORE.Time.draw = CORE.Time.current - CORE.Time.previous;
@@ -2113,18 +2118,22 @@ void EndDrawing(void)
 
     CORE.Time.frame = CORE.Time.update + CORE.Time.draw;
 
+	sceClibPrintf("[RLCore][MH] Starting to wait EndDrawing\n");
     // Wait for some milliseconds...
     if (CORE.Time.frame < CORE.Time.target)
     {
         WaitTime((float)(CORE.Time.target - CORE.Time.frame)*1000.0f);
-
+		
+		sceClibPrintf("[RLCore][MH] Wait, GetTime() called\n");
         CORE.Time.current = GetTime();
+		sceClibPrintf("[RLCore][MH] Wait, GetTime() returned %d\n", CORE.Time.current);
         double waitTime = CORE.Time.current - CORE.Time.previous;
         CORE.Time.previous = CORE.Time.current;
 
         CORE.Time.frame += waitTime;    // Total frame time: update + draw + wait
     }
 
+    TRACELOG(LOG_INFO, "[MH] Going to poll input evens rcore.c:2122\n");
     PollInputEvents();      // Poll user events (before next frame update)
 #endif
 
@@ -2138,7 +2147,7 @@ void EndDrawing(void)
         PlayAutomationEvent(CORE.Time.frameCounter);
     }
 #endif
-
+	sceClibPrintf("[RLCore][MH] EndDrawing Done Frame++\n");
     CORE.Time.frameCounter++;
 }
 
@@ -3500,6 +3509,10 @@ const char *GetGamepadName(int gamepad)
 #if defined(PLATFORM_WEB)
     return CORE.Input.Gamepad.name[gamepad];
 #endif
+#if defined(PLATFORM_SCE_VITA)
+    // TODO: check if ps vita or controller or tv
+	return NULL;
+#endif
     return NULL;
 }
 
@@ -3818,6 +3831,10 @@ static bool InitGraphicsDevice(int width, int height)
 
     // NOTE: Framebuffer (render area - CORE.Window.render.width, CORE.Window.render.height) could include black bars...
     // ...in top-down or left-right to match display aspect ratio (no weird scalings)
+
+#if defined(PLATFORM_SCE_VITA)
+    glfwSetErrorCallback(ErrorCallback);
+#endif
 
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
     glfwSetErrorCallback(ErrorCallback);
@@ -4299,7 +4316,6 @@ static bool InitGraphicsDevice(int width, int height)
     EGLint sampleBuffer = 0;
     if (CORE.Window.flags & FLAG_MSAA_4X_HINT)
     {
-		printf("\n[MH][Raylib]: InitGraphicsDevice MSAA x4\n");
         samples = 4;
         sampleBuffer = 1;
         TRACELOG(LOG_INFO, "DISPLAY: Trying to enable MSAA x4");
@@ -4338,13 +4354,10 @@ static bool InitGraphicsDevice(int width, int height)
 #if defined(PLATFORM_DRM)
     CORE.Window.device = eglGetDisplay((EGLNativeDisplayType)CORE.Window.gbmDevice);
 #else
-	printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay\n");
     CORE.Window.device = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-	printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay done\n");
 #endif
     if (CORE.Window.device == EGL_NO_DISPLAY)
     {
-		printf("\n[MH][Raylib]: InitGraphicsDevice eglGetDisplay failed\n");
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to initialize EGL device");
         return false;
     }
@@ -4353,7 +4366,6 @@ static bool InitGraphicsDevice(int width, int height)
     if (eglInitialize(CORE.Window.device, NULL, NULL) == EGL_FALSE)
     {
         // If all of the calls to eglInitialize returned EGL_FALSE then an error has occurred.
-		printf("\n[MH][Raylib]: InitGraphicsDevice Failed to initialize EGL device\n");
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to initialize EGL device");
         return false;
     }
@@ -4417,18 +4429,13 @@ static bool InitGraphicsDevice(int width, int height)
 #endif
 
     // Set rendering API
-	printf("\n[MH][Raylib]: InitGraphicsDevice eglBindApi\n");
     eglBindAPI(EGL_OPENGL_ES_API);
-	printf("\n[MH][Raylib]: InitGraphicsDevice eglBindApi done\n");
-	
+
     // Create an EGL rendering context
-	printf("\n[MH][Raylib]: InitGraphicsDevice egl context\n");
     CORE.Window.context = eglCreateContext(CORE.Window.device, CORE.Window.config, EGL_NO_CONTEXT, contextAttribs);
-	printf("\n[MH][Raylib]: InitGraphicsDevice egl context done\n");
     if (CORE.Window.context == EGL_NO_CONTEXT)
     {
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to create EGL context");
-		printf("\n[MH][Raylib]: InitGraphicsDevice Failed to create EGL context\n");
         return false;
     }
 #endif
@@ -4524,13 +4531,10 @@ static bool InitGraphicsDevice(int width, int height)
 #if defined(PLATFORM_SCE_VITA)
     CORE.Window.display.width = 960;
     CORE.Window.display.height = 544;
-    
-	printf("\n[MH][Raylib]: InitGraphicsDevice creating surface\n");
+
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)0, NULL);
-	printf("\n[MH][Raylib]: InitGraphicsDevice creating surface done\n");
     if (EGL_NO_SURFACE == CORE.Window.surface)
     {
-		printf("\n[MH][Raylib]: InitGraphicsDevice creating surface failed 0x%04x\n", eglGetError());
         TRACELOG(LOG_WARNING, "DISPLAY: Failed to create EGL window surface: 0x%04x", eglGetError());
         return false;
     }
@@ -5106,6 +5110,7 @@ void PollInputEvents(void)
 #endif
 
 #if defined(PLATFORM_SCE_VITA)
+	TRACELOG(LOG_INFO, "[MH] Start of inputs VITA\n");
 	// Check if gamepads are ready
     
 	//SceCtrlData pad;
@@ -5116,29 +5121,41 @@ void PollInputEvents(void)
 	//&CORE.Input.Gamepad.rearTouch
 	    
 	// Update Game pad info
-	uint8_t maxVitaPads = MAX_GAMEPADS;
-	if (MAX_GAMEPADS > 5) {
-		maxVitaPads = 5;
-	}
-	if (!sceCtrlIsMultiControllerSupported()) {
-		maxVitaPads = 1;
-	}
-	SceCtrlPortInfo* portInfo;
-	sceCtrlGetControllerPortInfo(portInfo);
-    for (int vPad = 0; vPad < maxVitaPads; vPad++)
-    {
-		if (portInfo->port[vPad] != SCE_CTRL_TYPE_UNPAIRED) {
-			CORE.Input.Gamepad.ready[vPad] = true;
-		}
-    }
+	uint8_t maxVitaPads = 1;
+	// if (MAX_GAMEPADS > 5) {
+		// maxVitaPads = 5;
+	// }
+	// if (!sceCtrlIsMultiControllerSupported()) {
+		// maxVitaPads = 1;
+	// }
+	// sceClibPrintf("[MH] Multipad support: %d\n", sceCtrlIsMultiControllerSupported());
+	// sceClibPrintf("[MH] maxVitaPads = %d\n", maxVitaPads);
+	
+	// SceCtrlPortInfo* portInfo;
+	// sceCtrlGetControllerPortInfo(portInfo);
+
+	
+    // for (int vPad = 0; vPad < maxVitaPads; vPad++)
+    // {
+		// sceClibPrintf("[MH] portInfo.port[%d]: %d\n", vPad, portInfo->port[vPad]);
+		// if (portInfo->port[vPad] != SCE_CTRL_TYPE_UNPAIRED) {
+			// CORE.Input.Gamepad.ready[vPad] = true;
+			// sceClibPrintf("[MH] portInfo.port[%d]: READY\n", vPad);
+		// }
+    // }
+    CORE.Input.Gamepad.ready[0] = true;
+	TRACELOG(LOG_INFO, "[MH] PAD SETUP DONE\n");
 
     // Register gamepads buttons events
     for (int i = 0; i < maxVitaPads; i++)
     {
+		TRACELOG(LOG_INFO, "[MH] Reading pad %d\n", i);
         if (CORE.Input.Gamepad.ready[i])     // Check if gamepad is available
         {		
             // Get current gamepad state
 			sceCtrlPeekBufferPositive(i, &CORE.Input.Gamepad.pad[i], 1);
+			TRACELOG(LOG_INFO, "[MH] Read buffer %d buttons: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
+			sceClibPrintf("[MH] portInfo.port[%d]: button: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
 
             for (int k = 0; k < MAX_GAMEPAD_BUTTONS; k++)
 			{
@@ -5197,10 +5214,13 @@ void PollInputEvents(void)
 			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_TRIGGER] = (kHeld & HidNpadButton_ZL) ? 1.0f : 0.0f;
 			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_TRIGGER] = (kHeld & HidNpadButton_ZR) ? 1.0f : 0.0f;
             //CORE.Input.Gamepad.axisCount = GLFW_GAMEPAD_AXIS_LAST + 1;
-        }
+        } else {
+			TRACELOG(LOG_INFO, "[MH] pad %d not ready\n", i);
+		}
     }
 
     CORE.Window.resizedLastFrame = false;
+	TRACELOG(LOG_INFO, "[MH] VITA inputs done\n");
 #endif // PLATFORM_SCE_VITA
 
 #if (defined(PLATFORM_RPI) || defined(PLATFORM_DRM)) && defined(SUPPORT_SSH_KEYBOARD_RPI)
@@ -5213,6 +5233,13 @@ void PollInputEvents(void)
     // NOTE: Gamepad (Joystick) input events polling is done asynchonously in another pthread - GamepadThread()
 #endif
 }
+#if defined(PLATFORM_SCE_VITA)
+static void ErrorCallback(int error, const char *description)
+{
+	sceClibPrintf("[RL-GLFW] Error: %i Description: %s", error, description);
+    //TRACELOG(LOG_WARNING, "GLFW: Error: %i Description: %s", error, description);
+}
+#endif
 
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
 // GLFW3 Error Callback, runs on GLFW3 error

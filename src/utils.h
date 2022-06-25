@@ -32,7 +32,18 @@
     #include <android/asset_manager.h>      // Required for: AAssetManager
 #endif
 
-#if defined(SUPPORT_TRACELOG)
+#if defined(PLATFORM_SCE_VITA)
+	#include <psp2/kernel/clib.h> 
+
+    ///#define TRACELOG(level, ...) do {sceClibPrintf("[RAYLIB]"); sceClibPrintf(__VA_ARGS__); sceClibPrintf("\n");} while(0)
+	#define TRACELOG(level, ...) sceClibPrintf("[RAYLIB]" __VA_ARGS__)
+    #if defined(SUPPORT_TRACELOG_DEBUG)
+        ///#define TRACELOGD(...) do {sceClibPrintf("[RAYLIB][DBG]"); sceClibPrintf(__VA_ARGS__); sceClibPrintf("\n");} while(0)
+		#define TRACELOGD(...) sceClibPrintf("[RAYLIB]" __VA_ARGS__)
+    #else
+        #define TRACELOGD(...) (void)0
+    #endif
+#elif defined(SUPPORT_TRACELOG)
     #define TRACELOG(level, ...) TraceLog(level, __VA_ARGS__)
 
     #if defined(SUPPORT_TRACELOG_DEBUG)
