@@ -30,8 +30,22 @@ To install GLFW-vita:
   set(THREADS_PREFER_PTHREAD_FLAG ON)
   find_package(Threads REQUIRED)
   ```
-I have managed to get this to compile RayLib using the above methods, but no application produced as of yet
-Stumbling on storeThread within GLFW-vita as this seems to have been build for using the SceDevkit
+I have managed to get this to compile RayLib using the above methods, with rendering working, and input code has been started
+Stumbling on storeThread within GLFW-vita as this seems to have been build for using the SceDevkit, it is possible to remove this code 
+in order to get it working.
+
+I have added some lines in posix_thread.c (glfw-vita) to get this to work, you need a storeThread method under the `#ifdef _VITASDK` section to work 
+but as of yet I have not implemented anything in that function.
+It now looks like this:
+
+```
+#ifdef _VITASDK
+...
+
+void storeThread() { }
+#else
+...
+```
 
 Compile:
 - Run `mkdir build && cd build`
