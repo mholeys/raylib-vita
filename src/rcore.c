@@ -308,6 +308,20 @@
 
 	#include <psp2/touch.h> 
     #include <psp2/ctrl.h>
+
+// ps vita analog stick value map calculation data	
+typedef struct point {
+    int x;
+    int y;
+} point;
+
+static point a = { 0, 0 };
+static point b = { 0, 0  };
+static point c = { 128, 32767 };
+static point d = { 128, 32767 };
+static int analog_map[256]; // ps vita analog stick value map
+static void vitaLerp (point *dest, point *a, point *b, float t);
+static int calc_bezier_y(float t);
     
     //#include <GLES2/gl2ext.h>	
 #endif
@@ -538,6 +552,9 @@ typedef struct CoreData {
 #endif
         unsigned int frameCounter;          // Frame counter
     } Time;
+#if defined(PLATFORM_SCE_VITA)
+	int analog_map[256]; // Data to map analog value to linear value
+#endif 
 } CoreData;
 
 //----------------------------------------------------------------------------------
@@ -913,6 +930,13 @@ void InitWindow(int width, int height, const char *title)
     // Enable sampling of the front and rear touch screens
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, 1);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, 1);
+	
+	// Create analog map data
+	for (int i = 0; i < 128; i++) { 
+		float t = (float)i/127.0f;
+		analog_map[i+128] = calc_bezier_y(t);
+		analog_map[127-i] = -1 * analog_map[i+128];
+	}
 	
 	//SceCtrlData pad;
 	//SceTouchData frontTouch;
@@ -2036,11 +2060,11 @@ void BeginDrawing(void)
 // End canvas drawing and swap buffers (double buffering)
 void EndDrawing(void)
 {
-	sceClibPrintf("[RLCore][MH] End drawing called\n");
+	//sceClibPrintf("[RLCore][MH] End drawing called\n");
     rlDrawRenderBatchActive();      // Update and draw internal render batch
-	sceClibPrintf("[RLCore][MH] rlDrawRenderBatchActive done\n");
+	//sceClibPrintf("[RLCore][MH] rlDrawRenderBatchActive done\n");
 #if defined(SUPPORT_MOUSE_CURSOR_POINT)
-	sceClibPrintf("[RLCore][MH] SUPPORT_MOUSE_CURSOR_POINT\n");
+	//sceClibPrintf("[RLCore][MH] SUPPORT_MOUSE_CURSOR_POINT\n");
     // Draw a small rectangle on mouse position for user reference
     if (!CORE.Input.Mouse.cursorHidden)
     {
@@ -2050,7 +2074,7 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_GIF_RECORDING)
-	sceClibPrintf("[RLCore][MH] SUPPORT_GIF_RECORDING\n");
+	//sceClibPrintf("[RLCore][MH] SUPPORT_GIF_RECORDING\n");
     // Draw record indicator
     if (gifRecording)
     {
@@ -2079,7 +2103,7 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_EVENTS_AUTOMATION)
-	sceClibPrintf("[RLCore][MH] SUPPORT_EVENTS_AUTOMATION\n");
+	//sceClibPrintf("[RLCore][MH] SUPPORT_EVENTS_AUTOMATION\n");
     // Draw record/play indicator
     if (eventsRecording)
     {
@@ -2108,10 +2132,10 @@ void EndDrawing(void)
 #endif
 
 #if !defined(SUPPORT_CUSTOM_FRAME_CONTROL)
-	sceClibPrintf("[RLCore][MH] SUPPORT_CUSTOM_FRAME_CONTROL\n");
+	//sceClibPrintf("[RLCore][MH] SUPPORT_CUSTOM_FRAME_CONTROL\n");
     SwapScreenBuffer();                  // Copy back buffer to front buffer (screen)
 	
-	sceClibPrintf("[RLCore][MH] SwapScreenBuffer done\n");
+	//sceClibPrintf("[RLCore][MH] SwapScreenBuffer done\n");
 	
     // Frame time control system
     CORE.Time.current = GetTime();
@@ -2120,22 +2144,22 @@ void EndDrawing(void)
 
     CORE.Time.frame = CORE.Time.update + CORE.Time.draw;
 
-	sceClibPrintf("[RLCore][MH] Starting to wait EndDrawing\n");
+	//sceClibPrintf("[RLCore][MH] Starting to wait EndDrawing\n");
     // Wait for some milliseconds...
     if (CORE.Time.frame < CORE.Time.target)
     {
         WaitTime((float)(CORE.Time.target - CORE.Time.frame)*1000.0f);
 		
-		sceClibPrintf("[RLCore][MH] Wait, GetTime() called\n");
+		//sceClibPrintf("[RLCore][MH] Wait, GetTime() called\n");
         CORE.Time.current = GetTime();
-		sceClibPrintf("[RLCore][MH] Wait, GetTime() returned %d\n", CORE.Time.current);
+		//sceClibPrintf("[RLCore][MH] Wait, GetTime() returned %d\n", CORE.Time.current);
         double waitTime = CORE.Time.current - CORE.Time.previous;
         CORE.Time.previous = CORE.Time.current;
 
         CORE.Time.frame += waitTime;    // Total frame time: update + draw + wait
     }
 
-    TRACELOG(LOG_INFO, "[MH] Going to poll input evens rcore.c:2122\n");
+    //TRACELOG(LOG_INFO, "[MH] Going to poll input evens rcore.c:2122\n");
     PollInputEvents();      // Poll user events (before next frame update)
 #endif
 
@@ -2149,7 +2173,7 @@ void EndDrawing(void)
         PlayAutomationEvent(CORE.Time.frameCounter);
     }
 #endif
-	sceClibPrintf("[RLCore][MH] EndDrawing Done Frame++\n");
+	//sceClibPrintf("[RLCore][MH] EndDrawing Done Frame++\n");
     CORE.Time.frameCounter++;
 }
 
@@ -3772,7 +3796,7 @@ Vector2 GetTouchPosition(int index)
 {
     Vector2 position = { -1.0f, -1.0f };
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_SCE_VITA) // TODO: USE VITA TOUCH
     // TODO: GLFW does not support multi-touch input just yet
     // https://www.codeproject.com/Articles/668404/Programming-for-Multi-Touch
     // https://docs.microsoft.com/en-us/windows/win32/wintouch/getting-started-with-multi-touch-messages
@@ -3793,7 +3817,7 @@ Vector2 GetTouchPosition(int index)
         position.y = position.y*((float)CORE.Window.render.height/(float)CORE.Window.display.height) - CORE.Window.renderOffset.y/2;
     }
 #endif
-#if defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
+#if defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_SCE_VITA)
     if (index < MAX_TOUCH_POINTS) position = CORE.Input.Touch.position[index];
     else TRACELOG(LOG_WARNING, "INPUT: Required touch point out of range (Max touch points: %i)", MAX_TOUCH_POINTS);
 #endif
@@ -3886,6 +3910,8 @@ static bool InitGraphicsDevice(int width, int height)
 #endif  // PLATFORM_WEB
 
 #if defined(PLATFORM_SCE_VITA)
+	// CORE.Window.screen.width = 960;
+	// CORE.Window.screen.height = 544;
     CORE.Window.display.width = CORE.Window.screen.width;
     CORE.Window.display.height = CORE.Window.screen.height;
 #endif  // PLATFORM_SCE_VITA
@@ -3988,7 +4014,7 @@ static bool InitGraphicsDevice(int width, int height)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
         glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-#if defined(PLATFORM_DESKTOP)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_SCE_VITA)
         glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
 #else
         glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_NATIVE_CONTEXT_API);
@@ -4150,6 +4176,12 @@ static bool InitGraphicsDevice(int width, int height)
     TRACELOG(LOG_INFO, "    > Viewport offsets: %i, %i", CORE.Window.renderOffset.x, CORE.Window.renderOffset.y);
 
 #endif  // PLATFORM_DESKTOP || PLATFORM_WEB
+
+#if  defined(PLATFORM_SCE_VITA)
+	CORE.Window.fullscreen = true;
+    CORE.Window.flags |= FLAG_FULLSCREEN_MODE;
+	
+#endif
 
 #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     CORE.Window.fullscreen = true;
@@ -4538,9 +4570,9 @@ static bool InitGraphicsDevice(int width, int height)
     }
 #endif
 
-/* #if defined(PLATFORM_SCE_VITA)
-    CORE.Window.display.width = 960;
-    CORE.Window.display.height = 544;
+#if defined(PLATFORM_SCE_VITA)
+    // CORE.Window.display.width = 960;
+    // CORE.Window.display.height = 544;
 
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)0, NULL);
     if (EGL_NO_SURFACE == CORE.Window.surface)
@@ -4555,7 +4587,7 @@ static bool InitGraphicsDevice(int width, int height)
      // -> CORE.Window.render.width/CORE.Window.render.height
      // -> CORE.Window.screenScale
     SetupFramebuffer(CORE.Window.display.width, CORE.Window.display.height);
-#endif */
+#endif
 
 #if defined(PLATFORM_DRM) || defined(PLATFORM_NX)
     CORE.Window.surface = eglCreateWindowSurface(CORE.Window.device, CORE.Window.config, (EGLNativeWindowType)CORE.Window.gbmSurface, NULL);
@@ -4780,6 +4812,9 @@ void WaitTime(float ms)
     #if defined(_WIN32)
         Sleep((unsigned int)ms);
     #endif
+	#if defined(PLATFORM_SCE_VITA)
+		sceKernelDelayThread((unsigned int)ms*1000);
+	#endif
     #if defined(__linux__) || defined(__FreeBSD__) || defined(__EMSCRIPTEN__)
         struct timespec req = { 0 };
         time_t sec = (int)(ms/1000.0f);
@@ -5124,7 +5159,7 @@ void PollInputEvents(void)
 #endif
 
 #if defined(PLATFORM_SCE_VITA)
-	TRACELOG(LOG_INFO, "[MH] Start of inputs VITA\n");
+	//TRACELOG(LOG_INFO, "[MH] Start of inputs VITA\n");
 	// Check if gamepads are ready
     
 	//SceCtrlData pad;
@@ -5158,18 +5193,18 @@ void PollInputEvents(void)
 		// }
     // }
     CORE.Input.Gamepad.ready[0] = true;
-	TRACELOG(LOG_INFO, "[MH] PAD SETUP DONE\n");
+	//TRACELOG(LOG_INFO, "[MH] PAD SETUP DONE\n");
 
     // Register gamepads buttons events
     for (int i = 0; i < maxVitaPads; i++)
     {
-		TRACELOG(LOG_INFO, "[MH] Reading pad %d\n", i);
+		// TRACELOG(LOG_INFO, "[MH] Reading pad %d\n", i);
         if (CORE.Input.Gamepad.ready[i])     // Check if gamepad is available
         {		
             // Get current gamepad state
 			sceCtrlPeekBufferPositive(i, &CORE.Input.Gamepad.pad[i], 1);
-			TRACELOG(LOG_INFO, "[MH] Read buffer %d buttons: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
-			sceClibPrintf("[MH] portInfo.port[%d]: button: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
+			// TRACELOG(LOG_INFO, "[MH] Read buffer %d buttons: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
+			// sceClibPrintf("[MH] portInfo.port[%d]: button: %d\n", i, CORE.Input.Gamepad.pad[i].buttons);
 
             for (int k = 0; k < MAX_GAMEPAD_BUTTONS; k++)
 			{
@@ -5203,9 +5238,9 @@ void PollInputEvents(void)
                     default: break;
                 }
 
-                if (button != -1)   // Check for valid button
+                if (button != -1) // Check for valid button
                 {
-                    if (CORE.Input.Gamepad.pad[i].buttons & button)
+                    if (CORE.Input.Gamepad.pad[i].buttons & button) // If button flag is set
                     {
                         CORE.Input.Gamepad.currentButtonState[i][k] = 1;
                         CORE.Input.Gamepad.lastButtonPressed = k;
@@ -5215,26 +5250,23 @@ void PollInputEvents(void)
             }
 
             // Get current axis state
-            // TODO: MH_VITA check if GLFW "just works"?
-			//CORE.Input.Gamepad.pad[i].lx;
-			//CORE.Input.Gamepad.pad[i].ly;
-			//CORE.Input.Gamepad.pad[i].rx;
-			//CORE.Input.Gamepad.pad[i].ry;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_X] = analog_map[CORE.Input.Gamepad.pad[i].lx]/32767.f;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_Y] = analog_map[CORE.Input.Gamepad.pad[i].ly]/32767.f;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_X] = analog_map[CORE.Input.Gamepad.pad[i].rx]/32767.f;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_Y] = analog_map[CORE.Input.Gamepad.pad[i].ry]/32767.f;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_TRIGGER] = (CORE.Input.Gamepad.pad[i].buttons & 1 << 8) ? 1.0f : 0.0f;
+			CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_TRIGGER] = (CORE.Input.Gamepad.pad[i].buttons & 1 << 9) ? 1.0f : 0.0f;
+			CORE.Input.Gamepad.axisCount = 6;
 
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_X] = (float)kAxisL.x / 32767.0f;
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_Y] = (float)kAxisL.y / 32767.0f;
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_X] = (float)kAxisR.x / 32767.0f;
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_Y] = (float)kAxisR.y / 32767.0f;
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_LEFT_TRIGGER] = (kHeld & HidNpadButton_ZL) ? 1.0f : 0.0f;
-			//CORE.Input.Gamepad.axisState[i][GAMEPAD_AXIS_RIGHT_TRIGGER] = (kHeld & HidNpadButton_ZR) ? 1.0f : 0.0f;
-            //CORE.Input.Gamepad.axisCount = GLFW_GAMEPAD_AXIS_LAST + 1;
+            // TODO: MH_VITA check if GLFW "just works"?
+			
         } else {
-			TRACELOG(LOG_INFO, "[MH] pad %d not ready\n", i);
+			//TRACELOG(LOG_INFO, "[MH] pad %d not ready\n", i);
 		}
     }
 
     CORE.Window.resizedLastFrame = false;
-	TRACELOG(LOG_INFO, "[MH] VITA inputs done\n");
+	// TRACELOG(LOG_INFO, "[MH] VITA inputs done\n");
 #endif // PLATFORM_SCE_VITA
 
 #if (defined(PLATFORM_RPI) || defined(PLATFORM_DRM)) && defined(SUPPORT_SSH_KEYBOARD_RPI)
@@ -7065,5 +7097,25 @@ static void PlayAutomationEvent(unsigned int frame)
             }
         }
     }
+}
+#endif
+
+#if defined(PLATFORM_SCE_VITA)
+static void vitaLerp (point *dest, point *a, point *b, float t)
+{
+    dest->x = a->x + (b->x - a->x)*t;
+    dest->y = a->y + (b->y - a->y)*t;
+}
+
+static int calc_bezier_y(float t)
+{
+    point ab, bc, cd, abbc, bccd, dest;
+    vitaLerp (&ab, &a, &b, t);
+    vitaLerp (&bc, &b, &c, t);
+    vitaLerp (&cd, &c, &d, t);
+    vitaLerp (&abbc, &ab, &bc, t);
+    vitaLerp (&bccd, &bc, &cd, t);
+    vitaLerp (&dest, &abbc, &bccd, t);
+    return dest.y;
 }
 #endif
