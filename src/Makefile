@@ -339,7 +339,7 @@ ifeq ($(RAYLIB_BUILD_MODE),RELEASE)
         CFLAGS += -O2
     endif
     ifeq ($(PLATFORM),PLATFORM_SCE_VITA)
-        CFLAGS += -O2
+        CFLAGS += -O3
     endif
 endif
 

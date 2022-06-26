@@ -1170,6 +1170,10 @@ bool WindowShouldClose(void)
     #if defined(PLATFORM_NX)
         if (!appletMainLoop()) return true;
     #endif
+	#if defined(PLATFORM_SCE_VITA)
+		CORE.Window.shouldClose = glfwWindowShouldClose(CORE.Window.handle);
+		glfwSetWindowShouldClose(CORE.Window.handle, GLFW_FALSE);
+	#endif
     if (CORE.Window.ready) return CORE.Window.shouldClose;
     else return true;
 #endif
@@ -2060,11 +2064,8 @@ void BeginDrawing(void)
 // End canvas drawing and swap buffers (double buffering)
 void EndDrawing(void)
 {
-	//sceClibPrintf("[RLCore][MH] End drawing called\n");
     rlDrawRenderBatchActive();      // Update and draw internal render batch
-	//sceClibPrintf("[RLCore][MH] rlDrawRenderBatchActive done\n");
 #if defined(SUPPORT_MOUSE_CURSOR_POINT)
-	//sceClibPrintf("[RLCore][MH] SUPPORT_MOUSE_CURSOR_POINT\n");
     // Draw a small rectangle on mouse position for user reference
     if (!CORE.Input.Mouse.cursorHidden)
     {
@@ -2074,7 +2075,6 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_GIF_RECORDING)
-	//sceClibPrintf("[RLCore][MH] SUPPORT_GIF_RECORDING\n");
     // Draw record indicator
     if (gifRecording)
     {
@@ -2103,7 +2103,6 @@ void EndDrawing(void)
 #endif
 
 #if defined(SUPPORT_EVENTS_AUTOMATION)
-	//sceClibPrintf("[RLCore][MH] SUPPORT_EVENTS_AUTOMATION\n");
     // Draw record/play indicator
     if (eventsRecording)
     {
@@ -2132,10 +2131,7 @@ void EndDrawing(void)
 #endif
 
 #if !defined(SUPPORT_CUSTOM_FRAME_CONTROL)
-	//sceClibPrintf("[RLCore][MH] SUPPORT_CUSTOM_FRAME_CONTROL\n");
     SwapScreenBuffer();                  // Copy back buffer to front buffer (screen)
-	
-	//sceClibPrintf("[RLCore][MH] SwapScreenBuffer done\n");
 	
     // Frame time control system
     CORE.Time.current = GetTime();
@@ -2144,22 +2140,18 @@ void EndDrawing(void)
 
     CORE.Time.frame = CORE.Time.update + CORE.Time.draw;
 
-	//sceClibPrintf("[RLCore][MH] Starting to wait EndDrawing\n");
     // Wait for some milliseconds...
     if (CORE.Time.frame < CORE.Time.target)
     {
         WaitTime((float)(CORE.Time.target - CORE.Time.frame)*1000.0f);
 		
-		//sceClibPrintf("[RLCore][MH] Wait, GetTime() called\n");
         CORE.Time.current = GetTime();
-		//sceClibPrintf("[RLCore][MH] Wait, GetTime() returned %d\n", CORE.Time.current);
         double waitTime = CORE.Time.current - CORE.Time.previous;
         CORE.Time.previous = CORE.Time.current;
 
         CORE.Time.frame += waitTime;    // Total frame time: update + draw + wait
     }
 
-    //TRACELOG(LOG_INFO, "[MH] Going to poll input evens rcore.c:2122\n");
     PollInputEvents();      // Poll user events (before next frame update)
 #endif
 
@@ -2173,7 +2165,6 @@ void EndDrawing(void)
         PlayAutomationEvent(CORE.Time.frameCounter);
     }
 #endif
-	//sceClibPrintf("[RLCore][MH] EndDrawing Done Frame++\n");
     CORE.Time.frameCounter++;
 }
 
@@ -2779,8 +2770,12 @@ float GetFrameTime(void)
 // NOTE: On PLATFORM_DESKTOP, timer is initialized on glfwInit()
 double GetTime(void)
 {
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
     return glfwGetTime();   // Elapsed time since glfwInit()
+#endif
+
+#if defined(PLATFORM_SCE_VITA)
+	return (double)(sceKernelGetProcessTimeWide() - CORE.Time.base)*1e-6;
 #endif
 
 #if defined(PLATFORM_ANDROID) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_NX)
@@ -3035,9 +3030,9 @@ const char *GetWorkingDirectory(void)
 {
     static char currentDir[MAX_FILEPATH_LENGTH] = { 0 };
     memset(currentDir, 0, MAX_FILEPATH_LENGTH);
-
-    char *path = GETCWD(currentDir, MAX_FILEPATH_LENGTH - 1);
-
+	
+	char *path = GETCWD(currentDir, MAX_FILEPATH_LENGTH - 1);
+	
     return path;
 }
 
@@ -3796,7 +3791,7 @@ Vector2 GetTouchPosition(int index)
 {
     Vector2 position = { -1.0f, -1.0f };
 
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_SCE_VITA) // TODO: USE VITA TOUCH
+#if defined(PLATFORM_DESKTOP)
     // TODO: GLFW does not support multi-touch input just yet
     // https://www.codeproject.com/Articles/668404/Programming-for-Multi-Touch
     // https://docs.microsoft.com/en-us/windows/win32/wintouch/getting-started-with-multi-touch-messages
@@ -3817,7 +3812,7 @@ Vector2 GetTouchPosition(int index)
         position.y = position.y*((float)CORE.Window.render.height/(float)CORE.Window.display.height) - CORE.Window.renderOffset.y/2;
     }
 #endif
-#if defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM) || defined(PLATFORM_SCE_VITA)
+#if defined(PLATFORM_WEB) || defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
     if (index < MAX_TOUCH_POINTS) position = CORE.Input.Touch.position[index];
     else TRACELOG(LOG_WARNING, "INPUT: Required touch point out of range (Max touch points: %i)", MAX_TOUCH_POINTS);
 #endif
@@ -3859,7 +3854,7 @@ static bool InitGraphicsDevice(int width, int height)
     // ...in top-down or left-right to match display aspect ratio (no weird scalings)
 
 #if defined(PLATFORM_SCE_VITA)
-//    glfwSetErrorCallback(ErrorCallback);
+    //glfwSetErrorCallback(ErrorCallback);
 #endif
 
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_SCE_VITA)
@@ -3914,6 +3909,7 @@ static bool InitGraphicsDevice(int width, int height)
 	// CORE.Window.screen.height = 544;
     CORE.Window.display.width = CORE.Window.screen.width;
     CORE.Window.display.height = CORE.Window.screen.height;
+	CORE.Window.fullscreen = true;
 #endif  // PLATFORM_SCE_VITA
 
 
@@ -4785,6 +4781,9 @@ static void InitTimer(void)
     }
     else TRACELOG(LOG_WARNING, "TIMER: Hi-resolution timer not available");
 #endif
+#if defined(PLATFORM_VITA)
+    CORE.Time.base = sceKernelGetProcessTimeWide();
+#endif
 
     CORE.Time.previous = GetTime();     // Get time as double
 }
@@ -5264,6 +5263,21 @@ void PollInputEvents(void)
 			//TRACELOG(LOG_INFO, "[MH] pad %d not ready\n", i);
 		}
     }
+
+	// Get touch input
+	/*
+	sceTouchPeek(0, CORE.Input.Touch.frontTouch, 1);
+	sceTouchPeek(1, CORE.Input.Touch.rearTouch, 1);
+	for (int i = 0; i < MAX_TOUCH_POINTS; i++) {
+		// Reset old values
+		CORE.Input.Touch.position[i].x = 0;
+		CORE.Input.Touch.position[i].y = 0;
+		if (i < 6) {
+			CORE.Input.Touch.position[i].x = CORE.Input.Touch.frontTouch.report[i].x;
+			CORE.Input.Touch.position[i].y = CORE.Input.Touch.frontTouch.report[i].y;
+		}
+	}
+	*/
 
     CORE.Window.resizedLastFrame = false;
 	// TRACELOG(LOG_INFO, "[MH] VITA inputs done\n");
